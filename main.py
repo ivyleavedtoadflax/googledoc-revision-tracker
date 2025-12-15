@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os.path
-from datetime import datetime, timedelta, timezone
 
 import typer
 from google.auth.transport.requests import Request
@@ -16,6 +15,7 @@ from doc_sync import (
     fetch_document_title,
     get_recent_exports,
     get_required_env,
+    get_time,
     run_flow_with_timeout,
 )
 

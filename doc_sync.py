@@ -59,8 +59,8 @@ class FlowResult:
     credentials: object | None = None
     error: BaseException | None = None
 
-
-
+def get_time(format: str = '%Y-%m-%d-%H%M%S') -> str:
+    return datetime.now(timezone.utc).strftime(format)
 
 
 def get_required_env(var_name: str) -> str:
@@ -303,7 +303,7 @@ def export_file_content(content: str, filename_base: str) -> Path:
 
 
 
-    filename = f"{datetime.now(timezone.utc).strftime('%Y-%m-%d-%H%M%S')}_{sanitize_filename(filename_base)}.txt"
+    filename = f"{get_time()}_{sanitize_filename(filename_base)}.txt"
 
 
 
