@@ -10,7 +10,9 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from doc_sync import (
     SCOPES,
     build_drive_service,
+    build_drive_service_v2,
     create_diff,
+    download_revisions,
     export_file_content,
     fetch_document_title,
     get_recent_exports,
@@ -100,6 +102,54 @@ def diff() -> None:
     diff_path = export_file_content("diffs", diff_content, "diff")
 
     print(f"Differences saved to {diff_path}")
+
+
+@app.command()
+def revisions(
+    timeout: int = typer.Option(
+        120, help="Seconds to wait for OAuth browser authorization"
+    ),
+) -> None:
+    """
+    Download all revision history of a Google Doc.
+    """
+    document_id = get_required_env("GOOGLE_DOCUMENT_ID")
+    client_secret_file = get_required_env("GOOGLE_OAUTH_CLIENT_SECRETS")
+
+    credentials = None
+    token_file = "token.json"
+
+    if os.path.exists(token_file):
+        credentials = Credentials.from_authorized_user_file(token_file, SCOPES)
+
+    if not credentials or not credentials.valid:
+        if credentials and credentials.expired and credentials.refresh_token:
+            credentials.refresh(Request())
+        else:
+            flow = InstalledAppFlow.from_client_secrets_file(
+                client_secret_file=client_secret_file,
+                scopes=SCOPES,
+                autogenerate_code_verifier=True,
+            )
+            credentials = run_flow_with_timeout(flow, timeout=timeout)
+
+        with open(token_file, "w") as token:
+            token.write(credentials.to_json())
+
+    # Build v2 service for revisions
+    service_v2 = build_drive_service_v2(credentials)
+
+    # Build v3 service for getting document title
+    service_v3 = build_drive_service(credentials)
+    doc_title = fetch_document_title(service_v3, document_id)
+
+    print(f"Downloading revision history for '{doc_title}'...")
+
+    downloaded_files = download_revisions(service_v2, document_id, "revisions")
+
+    print(f"Downloaded {len(downloaded_files)} revisions to revisions/{document_id}/")
+    for file_path in downloaded_files:
+        print(f"  - {file_path.name}")
 
 
 if __name__ == "__main__":

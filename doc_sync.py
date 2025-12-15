@@ -12,7 +12,7 @@ from typing import Dict, List, Protocol, cast, runtime_checkable
 
 from googleapiclient.discovery import build
 
-SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
+SCOPES = ["https://www.googleapis.com/auth/drive"]
 @runtime_checkable
 class DriveListRequest(Protocol):
     def execute(self) -> Dict[str, object]: ...
@@ -124,7 +124,7 @@ def run_flow_with_timeout(flow: InstalledAppFlowProtocol, timeout: int = 120) ->
 
 
 def build_drive_service(credentials: object) -> DriveService:
-    """Build a Drive API client."""
+    """Build a Drive API v3 client."""
 
     service = build(
         "drive",
@@ -133,6 +133,18 @@ def build_drive_service(credentials: object) -> DriveService:
         cache_discovery=False,
     )
     return cast(DriveService, service)
+
+
+def build_drive_service_v2(credentials: object) -> object:
+    """Build a Drive API v2 client for accessing revisions."""
+
+    service = build(
+        "drive",
+        "v2",
+        credentials=credentials,
+        cache_discovery=False,
+    )
+    return service
 
 
 def fetch_document_title(service: DriveService, file_id: str) -> str:
@@ -169,3 +181,47 @@ def create_diff(old_path: Path, new_path: Path) -> str:
         n=0
     )
     return "".join(diff)
+
+
+def download_revisions(service_v2: object, file_id: str, export_dir: str) -> List[Path]:
+    """Download all revisions of a Google Doc as text files."""
+    import urllib.request
+
+    # Create output directory
+    output_dir = Path(export_dir) / file_id
+    output_dir.mkdir(exist_ok=True, parents=True)
+
+    # Get all revisions
+    revisions = service_v2.revisions().list(fileId=file_id).execute()
+
+    if 'items' not in revisions:
+        return []
+
+    downloaded_files = []
+    items = revisions['items']
+
+    for revision in items:
+        revision_id = revision['id']
+        modified_date = revision['modifiedDate']
+
+        # Get modifier email if available
+        modifier = revision.get('lastModifyingUser', {}).get('emailAddress', 'unknown')
+
+        # Get export link for plain text
+        export_links = revision.get('exportLinks', {})
+        if 'text/plain' not in export_links:
+            continue
+
+        export_link = export_links['text/plain']
+
+        # Create filename with revision info
+        safe_modifier = sanitize_filename(modifier.split('@')[0])
+        safe_date = modified_date.replace(':', '-').replace('.', '-')
+        filename = f"{revision_id}_{safe_modifier}_{safe_date}.txt"
+        file_path = output_dir / filename
+
+        # Download the revision
+        urllib.request.urlretrieve(export_link, file_path)
+        downloaded_files.append(file_path)
+
+    return downloaded_files
