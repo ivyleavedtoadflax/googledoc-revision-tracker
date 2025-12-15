@@ -71,7 +71,7 @@ def export(
     else:
         content = str(response)
 
-    export_path = export_file_content(content, doc_title)
+    export_path = export_file_content("exports", content, doc_title)
 
     print(f"Exported current content of '{doc_title}' to {export_path}")
 
