@@ -13,18 +13,6 @@ from googleapiclient.discovery import build
 
 SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
 EXPORT_DIR = Path("exports")
-PAGE_SIZE = 200
-
-
-class RevisionSummaryBase(TypedDict):
-    id: str
-    modifiedTime: str
-
-
-class RevisionSummary(RevisionSummaryBase, total=False):
-    lastModifyingUser: Dict[str, object]
-
-
 @runtime_checkable
 class DriveListRequest(Protocol):
     def execute(self) -> Dict[str, object]: ...
@@ -33,25 +21,6 @@ class DriveListRequest(Protocol):
 @runtime_checkable
 class DriveMediaRequest(Protocol):
     def execute(self) -> bytes: ...
-
-
-@runtime_checkable
-class DriveRevisionsResource(Protocol):
-    def list(
-        self,
-        *,
-        fileId: str,
-        pageSize: int,
-        pageToken: Optional[str],
-        fields: str,
-    ) -> DriveListRequest: ...
-
-    def get_media(
-        self,
-        *,
-        fileId: str,
-        revisionId: str,
-    ) -> DriveMediaRequest: ...
 
 
 @runtime_checkable
@@ -69,8 +38,6 @@ class DriveFilesResource(Protocol):
 
 @runtime_checkable
 class DriveService(Protocol):
-    def revisions(self) -> DriveRevisionsResource: ...
-
     def files(self) -> DriveFilesResource: ...
 
 
@@ -369,48 +336,6 @@ def export_file_content(content: str, filename_base: str) -> Path:
 
 
 
-
-
-def _parse_modified_time(timestamp: str) -> datetime:
-    normalized = timestamp.replace("Z", "+00:00")
-    return datetime.fromisoformat(normalized)
-
-
-def list_revisions_since(
-    service: DriveService,
-    file_id: str,
-    since: datetime,
-) -> List[RevisionSummary]:
-    """List revisions updated on/after the provided datetime."""
-
-    normalized_since = since.astimezone(timezone.utc)
-    revisions: List[RevisionSummary] = []
-    page_token: Optional[str] = None
-
-    while True:
-        response = (
-            service.revisions()
-            .list(
-                fileId=file_id,
-                pageSize=PAGE_SIZE,
-                pageToken=page_token,
-                fields="nextPageToken,revisions(id,modifiedTime,lastModifyingUser)",
-            )
-            .execute()
-        )
-
-        raw_revisions = cast(Iterable[RevisionSummary], response.get("revisions", []))
-        for revision in raw_revisions:
-            modified_time = _parse_modified_time(revision["modifiedTime"])
-            if modified_time >= normalized_since:
-                revisions.append(revision)
-
-        page_token = cast(Optional[str], response.get("nextPageToken"))
-        if not page_token:
-            break
-
-    revisions.sort(key=lambda rev: _parse_modified_time(rev["modifiedTime"]))
-    return revisions
 
 
 def run_flow_with_timeout(flow: InstalledAppFlowProtocol, timeout: int = 120) -> object:

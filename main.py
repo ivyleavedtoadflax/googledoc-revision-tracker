@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import argparse
 import os.path
 from datetime import datetime, timedelta, timezone
 
+import typer
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -17,19 +17,18 @@ from doc_sync import (
     run_flow_with_timeout,
 )
 
+app = typer.Typer()
 
-def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Export the current content of a Google Doc to a text file",
-    )
-    parser.add_argument(
-        "--timeout",
-        type=int,
-        default=120,
-        help="Seconds to wait for OAuth browser authorization",
-    )
-    args = parser.parse_args()
 
+@app.command()
+def main(
+    timeout: int = typer.Option(
+        120, help="Seconds to wait for OAuth browser authorization"
+    ),
+) -> None:
+    """
+    Export the current content of a Google Doc to a text file.
+    """
     document_id = get_required_env("GOOGLE_DOCUMENT_ID")
     client_secret_file = get_required_env("GOOGLE_OAUTH_CLIENT_SECRETS")
 
@@ -48,7 +47,7 @@ def main() -> None:
                 scopes=SCOPES,
                 autogenerate_code_verifier=True,
             )
-            credentials = run_flow_with_timeout(flow, timeout=args.timeout)
+            credentials = run_flow_with_timeout(flow, timeout=timeout)
 
         with open(token_file, "w") as token:
             token.write(credentials.to_json())
@@ -76,4 +75,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    app()
