@@ -1,0 +1,20 @@
+[project]
+name = "google-sync-simple"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "google-api-python-client>=2.149.0",
+    "google-auth-oauthlib>=1.2.0",
+    "typer>=0.20.0",
+    "urllib3>=2.2.0",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8.4.0",
+]
+
+[tool.setuptools]
+py-modules = ["doc_sync", "main"]
