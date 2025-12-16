@@ -104,7 +104,6 @@ def get_required_env(var_name: str) -> str:
         SystemExit: If the environment variable is not set (exits with code 1).
 
     Example:
-        >>> doc_id = get_required_env("GOOGLE_DOCUMENT_ID")
         # If not set, prints error and exits
         # If set, returns the value
     """

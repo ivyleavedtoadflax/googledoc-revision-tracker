@@ -79,9 +79,6 @@ Create a `.env` file in the project root:
 ```bash
 # Path to your OAuth client secrets JSON file
 GOOGLE_OAUTH_CLIENT_SECRETS=path/to/client_secrets.json
-
-# Single document ID
-GOOGLE_DOCUMENT_ID=your_document_id_here
 ```
 
 **Option 3: CLI Arguments (Ad-hoc usage)**
@@ -106,12 +103,6 @@ uv sync
 
 **Using config file (documents.yaml):**
 ```bash
-python main.py
-```
-
-**Using environment variable (single document):**
-```bash
-export GOOGLE_DOCUMENT_ID=your_document_id
 python main.py
 ```
 
@@ -207,7 +198,6 @@ google-sync-simple/
 
 Ensure your `.env` file exists and contains both required variables:
 - `GOOGLE_OAUTH_CLIENT_SECRETS`
-- `GOOGLE_DOCUMENT_ID`
 
 ### "Authorization timed out" Error
 

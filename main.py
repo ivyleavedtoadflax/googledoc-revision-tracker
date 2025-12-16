@@ -78,7 +78,7 @@ def get_credentials(timeout: int = 120) -> Credentials:
 def download(
     document_ids: list[str] = typer.Argument(
         None,
-        help="Google Doc IDs to download. If not provided, reads from config file or GOOGLE_DOCUMENT_ID env var",
+        help="Google Doc IDs to download. If not provided, reads from config file.",
     ),
     timeout: int = typer.Option(
         120, help="Seconds to wait for OAuth browser authorization"
@@ -99,21 +99,10 @@ def download(
     if document_ids:
         doc_configs = [DocumentConfig(doc_id=doc_id) for doc_id in document_ids]
 
-    # 2. Config file from GOOGLE_DOCUMENTS_FILE env var
-    if not doc_configs:
-        config_file = os.environ.get("GOOGLE_DOCUMENTS_FILE")
-        if config_file:
-            doc_configs = load_document_ids_from_config(config_file)
-
-    # 3. Default config file: documents.yaml
+    # 2. Default config file: documents.yaml
     if not doc_configs:
         doc_configs = load_document_ids_from_config("documents.yaml")
 
-    # 4. Single document from GOOGLE_DOCUMENT_ID env var (backward compatibility)
-    if not doc_configs:
-        single_doc_id = os.environ.get("GOOGLE_DOCUMENT_ID")
-        if single_doc_id:
-            doc_configs = [DocumentConfig(doc_id=single_doc_id)]
 
     # Error if no document IDs found
     if not doc_configs:
@@ -121,8 +110,7 @@ def download(
             "Error: No document IDs provided.\n"
             "Please provide document IDs via:\n"
             "  1. CLI arguments: python main.py DOC_ID_1 DOC_ID_2\n"
-            "  2. Config file: Create documents.yaml with document IDs\n"
-            "  3. Environment variable: export GOOGLE_DOCUMENT_ID='your_doc_id'",
+            "  2. Config file: Create documents.yaml with document IDs\n",
             file=sys.stderr,
         )
         raise typer.Exit(1)
