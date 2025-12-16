@@ -8,16 +8,23 @@
 #   cp documents.yaml.example documents.yaml
 
 documents:
-  # Format: Specify document ID and optional custom folder name
-  # If no name is provided, the document ID will be used
+  # Format: Specify document ID, optional name, and optional granularity
 
-  # Example with custom names:
+  # Full format with all options:
   # - id: 1Q-qMIRexwdCRd38hhCRHEBpXeru2oi54LwfQU7NvWi8
   #   name: cv-matt
+  #   granularity: daily  # Options: all, hourly, daily, weekly, monthly
   #
   # - id: 2A-bNkPstuvwxCEf45ijKLMNOPabcd6efgh9hijklmno
   #   name: project-proposal
+  #   granularity: weekly  # Get final revision per week
 
-  # Simple format (uses document ID as folder name):
+  # Granularity options:
+  #   - all:     Download all revisions (default)
+  #   - hourly:  Final revision per hour
+  #   - daily:   Final revision per day
+  #   - weekly:  Final revision per week
+  #   - monthly: Final revision per month
+
+  # Simple format (uses document ID, downloads all revisions):
   # - 1Q-qMIRexwdCRd38hhCRHEBpXeru2oi54LwfQU7NvWi8
-  # - 2A-bNkPstuvwxCEf45ijKLMNOPabcd6efgh9hijklmno

@@ -8,12 +8,21 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Protocol, cast, runtime_checkable
+from typing import Dict, List, Literal, Protocol, cast, runtime_checkable
 
 import yaml
 from googleapiclient.discovery import build
 
 GOOGLE_DRIVE_SCOPES = ["https://www.googleapis.com/auth/drive"]
+
+Granularity = Literal["all", "hourly", "daily", "weekly", "monthly"]
+
+@dataclass
+class DocumentConfig:
+    """Configuration for a single document to track."""
+    doc_id: str
+    folder_name: str | None = None
+    granularity: Granularity = "all"
 
 @runtime_checkable
 class DriveListRequest(Protocol):
@@ -110,69 +119,84 @@ def get_required_env(var_name: str) -> str:
     )
     raise SystemExit(1)
 
-def load_document_ids_from_config(config_path: str = "documents.yaml") -> Dict[str, str | None]:
+def load_document_ids_from_config(config_path: str = "documents.yaml") -> List[DocumentConfig]:
     """
-    Load document IDs and optional names from YAML configuration file.
+    Load document configurations from YAML configuration file.
 
-    This function reads a YAML file containing document IDs and optional custom names.
-    Supports two formats:
+    This function reads a YAML file containing document IDs, optional custom names,
+    and optional granularity settings.
+
+    Supported formats:
     1. Simple: list of document ID strings
-    2. Named: list of dicts with 'id' and optional 'name' fields
+    2. Full: list of dicts with 'id' and optional 'name' and 'granularity' fields
 
     Args:
         config_path: Path to YAML configuration file (default: "documents.yaml").
 
     Returns:
-        Dict mapping document IDs to optional folder names. If no name is specified,
-        the value is None and the document ID will be used as the folder name.
-        Returns empty dict if file doesn't exist or is malformed.
+        List of DocumentConfig objects. Returns empty list if file doesn't exist
+        or is malformed.
 
     Example:
-        >>> # documents.yaml content (named format):
+        >>> # documents.yaml content (full format):
         >>> # documents:
         >>> #   - id: 1Q-qMIRexwd...
         >>> #     name: cv-matt
+        >>> #     granularity: daily
         >>> #   - id: 2A-bNkPstu...
         >>> #     name: project-proposal
+        >>> #     granularity: weekly
         >>> docs = load_document_ids_from_config()
-        >>> print(docs)
-        {'1Q-qMIRexwd...': 'cv-matt', '2A-bNkPstu...': 'project-proposal'}
+        >>> print(docs[0])
+        DocumentConfig(doc_id='1Q-qMIRexwd...', folder_name='cv-matt', granularity='daily')
 
         >>> # documents.yaml content (simple format):
         >>> # documents:
         >>> #   - 1Q-qMIRexwd...
         >>> #   - 2A-bNkPstu...
         >>> docs = load_document_ids_from_config()
-        >>> print(docs)
-        {'1Q-qMIRexwd...': None, '2A-bNkPstu...': None}
+        >>> print(docs[0])
+        DocumentConfig(doc_id='1Q-qMIRexwd...', folder_name=None, granularity='all')
     """
     path = Path(config_path)
     if not path.exists():
-        return {}
+        return []
 
     try:
         with path.open() as f:
             config = yaml.safe_load(f)
 
         if not config or 'documents' not in config:
-            return {}
+            return []
 
-        result = {}
+        result = []
         for item in config['documents']:
             if isinstance(item, str):
                 # Simple format: just document ID
-                result[item] = None
+                result.append(DocumentConfig(doc_id=item))
             elif isinstance(item, dict) and 'id' in item:
-                # Named format: dict with id and optional name
+                # Full format: dict with id and optional name/granularity
                 doc_id = item['id']
-                doc_name = item.get('name')
-                result[doc_id] = doc_name
+                folder_name = item.get('name')
+                granularity = item.get('granularity', 'all')
+
+                # Validate granularity
+                valid_granularities = {"all", "hourly", "daily", "weekly", "monthly"}
+                if granularity not in valid_granularities:
+                    print(f"Warning: Invalid granularity '{granularity}' for {doc_id}, using 'all'")
+                    granularity = 'all'
+
+                result.append(DocumentConfig(
+                    doc_id=doc_id,
+                    folder_name=folder_name,
+                    granularity=granularity
+                ))
             # Ignore malformed entries
 
         return result
     except Exception:
-        # If YAML is malformed or any other error, return empty dict
-        return {}
+        # If YAML is malformed or any other error, return empty list
+        return []
 
 def sanitize_filename(title: str, max_length: int = 200) -> str:
     """
@@ -217,6 +241,75 @@ def sanitize_filename(title: str, max_length: int = 200) -> str:
         safe_title = safe_title[:allowed_length]
 
     return safe_title
+
+def filter_revisions_by_granularity(revisions: List[Dict], granularity: Granularity) -> List[Dict]:
+    """
+    Filter revisions to keep only the final revision per time period.
+
+    Groups revisions by time period (hour, day, week, or month) and keeps only
+    the last revision from each period. This reduces the number of revisions
+    downloaded while maintaining representative snapshots over time.
+
+    Args:
+        revisions: List of revision dicts from Google Drive API
+        granularity: Time period granularity ('all', 'hourly', 'daily', 'weekly', 'monthly')
+
+    Returns:
+        Filtered list of revisions (last revision per period)
+
+    Example:
+        >>> revisions = [
+        ...     {'id': '1', 'modifiedDate': '2025-01-15T10:00:00.000Z'},
+        ...     {'id': '2', 'modifiedDate': '2025-01-15T14:00:00.000Z'},
+        ...     {'id': '3', 'modifiedDate': '2025-01-16T09:00:00.000Z'},
+        ... ]
+        >>> filtered = filter_revisions_by_granularity(revisions, 'daily')
+        >>> len(filtered)
+        2  # One for Jan 15, one for Jan 16
+    """
+    if granularity == 'all':
+        return revisions
+
+    if not revisions:
+        return []
+
+    # Group revisions by time period
+    from collections import defaultdict
+    periods = defaultdict(list)
+
+    for revision in revisions:
+        # Parse ISO 8601 timestamp
+        timestamp_str = revision['modifiedDate']
+        # Parse format: 2025-01-15T10:30:45.123Z
+        dt = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+
+        # Determine period key based on granularity
+        if granularity == 'hourly':
+            period_key = dt.strftime('%Y-%m-%d-%H')
+        elif granularity == 'daily':
+            period_key = dt.strftime('%Y-%m-%d')
+        elif granularity == 'weekly':
+            # Use ISO week number
+            period_key = dt.strftime('%Y-W%W')
+        elif granularity == 'monthly':
+            period_key = dt.strftime('%Y-%m')
+        else:
+            period_key = 'all'
+
+        periods[period_key].append((dt, revision))
+
+    # Get the last revision from each period
+    filtered = []
+    for period_revisions in periods.values():
+        # Sort by timestamp and take the last one
+        period_revisions.sort(key=lambda x: x[0])
+        _, last_revision = period_revisions[-1]
+        filtered.append(last_revision)
+
+    # Sort filtered revisions by timestamp
+    filtered.sort(key=lambda r: r['modifiedDate'])
+
+    return filtered
 
 def get_unique_folder_name(base_dir: str, doc_title: str, doc_id: str) -> str:
     """
@@ -401,18 +494,22 @@ def download_revisions(
     credentials: object = None,
     doc_title: str | None = None,
     folder_name: str | None = None,
+    granularity: Granularity = "all",
 ) -> List[Path]:
     """
-    Download all revisions of a Google Doc as individual text files.
+    Download revisions of a Google Doc as individual text files.
 
     Uses Drive API v2 to fetch the complete revision history of a document.
     Each revision is saved as a separate file with metadata in the filename.
+    Can filter revisions by time granularity to download only the final
+    revision per period (hour, day, week, or month).
 
     The function:
     1. Creates a subdirectory using folder_name (if provided) or document ID
     2. Fetches all available revisions via API
-    3. Downloads each revision's plain text export
-    4. Saves with filename: {timestamp}.txt
+    3. Filters by granularity (if not 'all')
+    4. Downloads each revision's plain text export
+    5. Saves with filename: {timestamp}.txt
 
     Args:
         service_v2: Drive API v2 service object (required for revisions).
@@ -422,6 +519,8 @@ def download_revisions(
         doc_title: Document title (used for display in calling code).
         folder_name: Custom folder name for this document's revisions. If None,
                      uses file_id as folder name (optional).
+        granularity: Time period for filtering revisions. Options:
+                     'all' (default), 'hourly', 'daily', 'weekly', 'monthly'.
 
     Returns:
         List of Path objects for all downloaded revision files.
@@ -436,7 +535,8 @@ def download_revisions(
         >>> service_v2 = build_drive_service_v2(credentials)
         >>> files = download_revisions(
         ...     service_v2, "doc_id", "revisions",
-        ...     folder_name="cv-matt", doc_title="My CV"
+        ...     folder_name="cv-matt", doc_title="My CV",
+        ...     granularity="daily"
         ... )
         >>> print(f"Downloaded {len(files)} revisions")
         >>> for f in files:
@@ -455,8 +555,15 @@ def download_revisions(
     if 'items' not in revisions:
         return []
 
-    downloaded_files = []
     items = revisions['items']
+
+    # Filter by granularity
+    if granularity != 'all':
+        original_count = len(items)
+        items = filter_revisions_by_granularity(items, granularity)
+        print(f"  Filtered {original_count} revisions to {len(items)} ({granularity} granularity)")
+
+    downloaded_files = []
 
     for revision in items:
         revision_id = revision['id']

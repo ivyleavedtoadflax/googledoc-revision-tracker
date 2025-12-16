@@ -11,6 +11,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 
 from drive_revisions import (
     GOOGLE_DRIVE_SCOPES,
+    DocumentConfig,
     build_drive_service,
     build_drive_service_v2,
     download_revisions,
@@ -91,32 +92,31 @@ def download(
         python main.py DOC_ID_1                  # Single document
         python main.py DOC_ID_1 DOC_ID_2         # Multiple documents
     """
-    # Resolve document IDs and names from multiple sources (priority order)
-    # doc_map is a dict mapping document IDs to optional folder names
-    doc_map: dict[str, str | None] = {}
+    # Resolve document configurations from multiple sources (priority order)
+    doc_configs: list[DocumentConfig] = []
 
-    # 1. CLI arguments (highest priority) - no custom names for CLI args
+    # 1. CLI arguments (highest priority) - no custom names/granularity for CLI args
     if document_ids:
-        doc_map = {doc_id: None for doc_id in document_ids}
+        doc_configs = [DocumentConfig(doc_id=doc_id) for doc_id in document_ids]
 
     # 2. Config file from GOOGLE_DOCUMENTS_FILE env var
-    if not doc_map:
+    if not doc_configs:
         config_file = os.environ.get("GOOGLE_DOCUMENTS_FILE")
         if config_file:
-            doc_map = load_document_ids_from_config(config_file)
+            doc_configs = load_document_ids_from_config(config_file)
 
     # 3. Default config file: documents.yaml
-    if not doc_map:
-        doc_map = load_document_ids_from_config("documents.yaml")
+    if not doc_configs:
+        doc_configs = load_document_ids_from_config("documents.yaml")
 
     # 4. Single document from GOOGLE_DOCUMENT_ID env var (backward compatibility)
-    if not doc_map:
+    if not doc_configs:
         single_doc_id = os.environ.get("GOOGLE_DOCUMENT_ID")
         if single_doc_id:
-            doc_map = {single_doc_id: None}
+            doc_configs = [DocumentConfig(doc_id=single_doc_id)]
 
     # Error if no document IDs found
-    if not doc_map:
+    if not doc_configs:
         print(
             "Error: No document IDs provided.\n"
             "Please provide document IDs via:\n"
@@ -136,25 +136,27 @@ def download(
 
     # Process each document
     total_downloaded = 0
-    total_documents = len(doc_map)
+    total_documents = len(doc_configs)
     successful_downloads = 0
 
     print(f"Processing {total_documents} document(s)...\n")
 
-    for idx, (doc_id, folder_name) in enumerate(doc_map.items(), 1):
+    for idx, doc_config in enumerate(doc_configs, 1):
         try:
             # Fetch document title for display
-            doc_title = fetch_document_title(service_v3, doc_id)
-            print(f"[{idx}/{total_documents}] Downloading '{doc_title}' ({doc_id})...")
+            doc_title = fetch_document_title(service_v3, doc_config.doc_id)
+            granularity_info = f" ({doc_config.granularity} granularity)" if doc_config.granularity != "all" else ""
+            print(f"[{idx}/{total_documents}] Downloading '{doc_title}' ({doc_config.doc_id}){granularity_info}...")
 
-            # Download revisions with custom folder name or document ID
+            # Download revisions with config settings
             downloaded_files = download_revisions(
                 service_v2,
-                doc_id,
+                doc_config.doc_id,
                 "revisions",
                 credentials,
                 doc_title=doc_title,
-                folder_name=folder_name,
+                folder_name=doc_config.folder_name,
+                granularity=doc_config.granularity,
             )
 
             file_count = len(downloaded_files)
@@ -162,11 +164,11 @@ def download(
             successful_downloads += 1
 
             # Show which folder was used
-            target_folder = folder_name if folder_name else doc_id
+            target_folder = doc_config.folder_name if doc_config.folder_name else doc_config.doc_id
             print(f"  ✓ Downloaded {file_count} revision(s) to revisions/{target_folder}/\n")
 
         except Exception as e:
-            print(f"  ✗ Error downloading {doc_id}: {e}\n")
+            print(f"  ✗ Error downloading {doc_config.doc_id}: {e}\n")
             continue
 
     # Print summary
