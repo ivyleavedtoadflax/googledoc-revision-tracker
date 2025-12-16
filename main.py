@@ -91,31 +91,32 @@ def download(
         python main.py DOC_ID_1                  # Single document
         python main.py DOC_ID_1 DOC_ID_2         # Multiple documents
     """
-    # Resolve document IDs from multiple sources (priority order)
-    resolved_ids: list[str] = []
+    # Resolve document IDs and names from multiple sources (priority order)
+    # doc_map is a dict mapping document IDs to optional folder names
+    doc_map: dict[str, str | None] = {}
 
-    # 1. CLI arguments (highest priority)
+    # 1. CLI arguments (highest priority) - no custom names for CLI args
     if document_ids:
-        resolved_ids = document_ids
+        doc_map = {doc_id: None for doc_id in document_ids}
 
     # 2. Config file from GOOGLE_DOCUMENTS_FILE env var
-    if not resolved_ids:
+    if not doc_map:
         config_file = os.environ.get("GOOGLE_DOCUMENTS_FILE")
         if config_file:
-            resolved_ids = load_document_ids_from_config(config_file)
+            doc_map = load_document_ids_from_config(config_file)
 
     # 3. Default config file: documents.yaml
-    if not resolved_ids:
-        resolved_ids = load_document_ids_from_config("documents.yaml")
+    if not doc_map:
+        doc_map = load_document_ids_from_config("documents.yaml")
 
     # 4. Single document from GOOGLE_DOCUMENT_ID env var (backward compatibility)
-    if not resolved_ids:
+    if not doc_map:
         single_doc_id = os.environ.get("GOOGLE_DOCUMENT_ID")
         if single_doc_id:
-            resolved_ids = [single_doc_id]
+            doc_map = {single_doc_id: None}
 
     # Error if no document IDs found
-    if not resolved_ids:
+    if not doc_map:
         print(
             "Error: No document IDs provided.\n"
             "Please provide document IDs via:\n"
@@ -135,31 +136,34 @@ def download(
 
     # Process each document
     total_downloaded = 0
-    total_documents = len(resolved_ids)
+    total_documents = len(doc_map)
     successful_downloads = 0
 
     print(f"Processing {total_documents} document(s)...\n")
 
-    for idx, doc_id in enumerate(resolved_ids, 1):
+    for idx, (doc_id, folder_name) in enumerate(doc_map.items(), 1):
         try:
-            # Fetch document title
+            # Fetch document title for display
             doc_title = fetch_document_title(service_v3, doc_id)
             print(f"[{idx}/{total_documents}] Downloading '{doc_title}' ({doc_id})...")
 
-            # Download revisions with title-based folder
+            # Download revisions with custom folder name or document ID
             downloaded_files = download_revisions(
                 service_v2,
                 doc_id,
                 "revisions",
                 credentials,
                 doc_title=doc_title,
+                folder_name=folder_name,
             )
 
             file_count = len(downloaded_files)
             total_downloaded += file_count
             successful_downloads += 1
 
-            print(f"  ✓ Downloaded {file_count} revision(s)\n")
+            # Show which folder was used
+            target_folder = folder_name if folder_name else doc_id
+            print(f"  ✓ Downloaded {file_count} revision(s) to revisions/{target_folder}/\n")
 
         except Exception as e:
             print(f"  ✗ Error downloading {doc_id}: {e}\n")

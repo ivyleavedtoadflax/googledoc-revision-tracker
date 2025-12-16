@@ -1,14 +1,23 @@
 # Configuration file for tracking multiple Google Docs
 #
-# List the Google Doc IDs you want to track here.
+# Define documents with custom folder names for organization.
 # To find a document ID, look at the document URL:
 # https://docs.google.com/document/d/YOUR_DOC_ID_HERE/edit
 #
-# Copy this file to 'documents.yaml' and add your document IDs:
+# Copy this file to 'documents.yaml' and add your documents:
 #   cp documents.yaml.example documents.yaml
 
 documents:
-  # Example document IDs (replace with your actual document IDs):
+  # Format: Specify document ID and optional custom folder name
+  # If no name is provided, the document ID will be used
+
+  # Example with custom names:
+  # - id: 1Q-qMIRexwdCRd38hhCRHEBpXeru2oi54LwfQU7NvWi8
+  #   name: cv-matt
+  #
+  # - id: 2A-bNkPstuvwxCEf45ijKLMNOPabcd6efgh9hijklmno
+  #   name: project-proposal
+
+  # Simple format (uses document ID as folder name):
   # - 1Q-qMIRexwdCRd38hhCRHEBpXeru2oi54LwfQU7NvWi8
   # - 2A-bNkPstuvwxCEf45ijKLMNOPabcd6efgh9hijklmno
-  # - 3C-dPlQstuvwxFGh56klMNOPQRabcd7efgh0ijklmnop
