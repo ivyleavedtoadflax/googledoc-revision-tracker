@@ -318,41 +318,6 @@ def filter_revisions_by_granularity(revisions: List[Dict], granularity: Granular
 
     return filtered
 
-def get_unique_folder_name(base_dir: str, doc_title: str, doc_id: str) -> str:
-    """
-    Generate unique folder name for document revisions.
-
-    If a folder with the sanitized title already exists, appends the last 6 characters
-    of the document ID to ensure uniqueness. This handles the case where multiple
-    documents have identical titles.
-
-    Args:
-        base_dir: Base directory where revision folders are stored (e.g., "revisions").
-        doc_title: Document title from Google Drive.
-        doc_id: Google Drive document ID.
-
-    Returns:
-        Unique folder name (not a full path, just the folder name).
-
-    Example:
-        >>> # First document named "Meeting Notes"
-        >>> get_unique_folder_name("revisions", "Meeting Notes", "abc123xyz")
-        'Meeting_Notes'
-        >>> # Second document with same title (folder already exists)
-        >>> get_unique_folder_name("revisions", "Meeting Notes", "def456uvw")
-        'Meeting_Notes_456uvw'
-    """
-    base_path = Path(base_dir)
-    safe_title = sanitize_filename(doc_title)
-    folder_path = base_path / safe_title
-
-    if not folder_path.exists():
-        return safe_title
-
-    # Folder exists - append last 6 chars of document ID
-    id_suffix = doc_id[-6:]
-    return f"{safe_title}_{id_suffix}"
-
 def run_flow_with_timeout(flow: InstalledAppFlowProtocol, timeout: int = 120) -> object:
     """
     Run the Google OAuth flow with a timeout to avoid hanging browser sessions.
