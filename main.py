@@ -67,9 +67,12 @@ def get_credentials(timeout: int = 120) -> Credentials:
             )
             credentials = run_flow_with_timeout(flow, timeout=timeout)
 
-        # Save credentials for next time
+        # Save credentials for next time with restrictive permissions
         with open(token_file, "w") as token:
             token.write(credentials.to_json())
+
+        # Set file permissions to owner read/write only (0600)
+        os.chmod(token_file, 0o600)
 
     return credentials
 
