@@ -193,8 +193,9 @@ def load_document_ids_from_config(config_path: str = "documents.yaml") -> List[D
             # Ignore malformed entries
 
         return result
-    except Exception:
-        # If YAML is malformed or any other error, return empty list
+    except (yaml.YAMLError, IOError, OSError, KeyError, TypeError, ValueError) as e:
+        # If YAML is malformed or any other error, warn and return empty list
+        print(f"Warning: Failed to parse config file '{config_path}': {e}", file=sys.stderr)
         return []
 
 def sanitize_filename(title: str, max_length: int = 200) -> str:
