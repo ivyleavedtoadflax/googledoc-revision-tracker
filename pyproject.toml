@@ -12,5 +12,8 @@ dependencies = [
     "urllib3>=2.2.0",
 ]
 
+[project.scripts]
+google-sync = "main:app"
+
 [tool.setuptools]
-py-modules = ["doc_sync", "main"]
+py-modules = ["drive_revisions", "main"]
