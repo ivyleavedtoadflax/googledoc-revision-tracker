@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import os
 import os.path
+import shutil
 import sys
+from pathlib import Path
 
 import typer
+import yaml
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -13,6 +16,7 @@ from googleapiclient.errors import HttpError
 from drive_revisions import (
     GOOGLE_DRIVE_SCOPES,
     DocumentConfig,
+    Granularity,
     build_drive_service,
     build_drive_service_v2,
     download_revisions,
@@ -25,6 +29,10 @@ from drive_revisions import (
 app = typer.Typer(
     help="Download and track Google Docs revision history with granular time filtering."
 )
+
+# Create sub-app for config commands
+config_app = typer.Typer(help="Manage document configuration")
+app.add_typer(config_app, name="config")
 
 
 def credentials_exist() -> bool:
@@ -246,6 +254,123 @@ def download(
     print(f"Summary: Successfully downloaded {successful_downloads}/{total_documents} document(s)")
     print(f"Total revisions downloaded: {total_downloaded}")
     print("=" * 50)
+
+
+@config_app.command("init")
+def config_init(force: bool = typer.Option(False, "--force", "-f", help="Overwrite existing documents.yaml")) -> None:
+    """
+    Initialize a new documents.yaml configuration file.
+
+    Creates documents.yaml from the example template.
+
+    Examples:
+        uv run google-sync config init         # Create config file
+        uv run google-sync config init --force # Overwrite existing
+    """
+    config_file = Path("documents.yaml")
+    example_file = Path("documents.yaml.example")
+
+    if config_file.exists() and not force:
+        print("✗ documents.yaml already exists!", file=sys.stderr)
+        print("Use --force to overwrite", file=sys.stderr)
+        raise typer.Exit(1)
+
+    if not example_file.exists():
+        print("✗ documents.yaml.example not found!", file=sys.stderr)
+        raise typer.Exit(1)
+
+    shutil.copy(example_file, config_file)
+    print(f"✓ Created documents.yaml from template")
+    print(f"\nEdit documents.yaml to add your document IDs")
+
+
+@config_app.command("add")
+def config_add(
+    document_id: str = typer.Argument(..., help="Google Doc ID to add"),
+    name: str = typer.Option(None, "--name", "-n", help="Custom folder name"),
+    granularity: Granularity = typer.Option("all", "--granularity", "-g", help="Time granularity for revisions"),
+) -> None:
+    """
+    Add a new document to documents.yaml configuration.
+
+    Creates documents.yaml if it doesn't exist.
+
+    Examples:
+        uv run google-sync config add DOC_ID
+        uv run google-sync config add DOC_ID --name cv-matt
+        uv run google-sync config add DOC_ID --name cv-matt --granularity daily
+    """
+    config_file = Path("documents.yaml")
+
+    # Load existing config or create new
+    if config_file.exists():
+        with open(config_file) as f:
+            config = yaml.safe_load(f) or {}
+    else:
+        config = {}
+
+    if "documents" not in config:
+        config["documents"] = []
+
+    # Check if document already exists
+    for doc in config["documents"]:
+        if isinstance(doc, dict) and doc.get("id") == document_id:
+            print(f"✗ Document {document_id} already in config!", file=sys.stderr)
+            raise typer.Exit(1)
+        elif isinstance(doc, str) and doc == document_id:
+            print(f"✗ Document {document_id} already in config!", file=sys.stderr)
+            raise typer.Exit(1)
+
+    # Add new document
+    if name or granularity != "all":
+        new_doc = {"id": document_id}
+        if name:
+            new_doc["name"] = name
+        if granularity != "all":
+            new_doc["granularity"] = granularity
+        config["documents"].append(new_doc)
+    else:
+        # Simple format
+        config["documents"].append(document_id)
+
+    # Save config
+    with open(config_file, "w") as f:
+        yaml.dump(config, f, default_flow_style=False, sort_keys=False)
+
+    print(f"✓ Added document {document_id} to config")
+    if name:
+        print(f"  Folder name: {name}")
+    if granularity != "all":
+        print(f"  Granularity: {granularity}")
+
+
+@config_app.command("list")
+def config_list() -> None:
+    """
+    List all documents in configuration.
+
+    Examples:
+        uv run google-sync config list
+    """
+    config_file = Path("documents.yaml")
+
+    if not config_file.exists():
+        print("✗ No documents.yaml found!", file=sys.stderr)
+        print("Run 'google-sync config init' to create one", file=sys.stderr)
+        raise typer.Exit(1)
+
+    doc_configs = load_document_ids_from_config(str(config_file))
+
+    if not doc_configs:
+        print("No documents configured")
+        return
+
+    print(f"Configured documents ({len(doc_configs)}):\n")
+    for idx, doc_config in enumerate(doc_configs, 1):
+        folder = doc_config.folder_name or doc_config.doc_id
+        gran = f" ({doc_config.granularity})" if doc_config.granularity != "all" else ""
+        print(f"{idx}. {doc_config.doc_id}")
+        print(f"   Folder: {folder}{gran}")
 
 
 if __name__ == "__main__":
