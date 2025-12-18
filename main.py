@@ -289,18 +289,16 @@ def config_add(
     document_id: str = typer.Argument(None, help="Google Doc ID to add"),
     name: str = typer.Option(None, "--name", "-n", help="Custom folder name"),
     granularity: Granularity = typer.Option(None, "--granularity", "-g", help="Time granularity for revisions"),
-    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompt"),
 ) -> None:
     """
-    Add a new document to documents.yaml configuration (interactive).
+    Add a new document to documents.yaml configuration.
 
-    If arguments are not provided, will prompt interactively.
+    Interactive mode if arguments missing, otherwise runs directly.
 
     Examples:
         uv run google-sync config add                        # Fully interactive
         uv run google-sync config add DOC_ID                 # Prompt for optional fields
-        uv run google-sync config add DOC_ID --yes           # Skip confirmation
-        uv run google-sync config add DOC_ID -n cv -g daily  # All fields provided
+        uv run google-sync config add DOC_ID -n cv -g daily  # Direct add (no prompts)
     """
     config_file = Path("documents.yaml")
 
@@ -349,7 +347,7 @@ def config_add(
 
         print(f"Granularity: {granularity}")
 
-        # Show summary and confirm
+        # Show summary and confirm (only in interactive mode)
         print("\n" + "─" * 50)
         print("Summary:")
         print(f"  Document ID: {document_id}")
@@ -357,11 +355,10 @@ def config_add(
         print(f"  Granularity: {granularity}")
         print("─" * 50)
 
-        if not yes:
-            confirm = typer.confirm("\nAdd this document to config?")
-            if not confirm:
-                print("Cancelled")
-                raise typer.Exit(0)
+        confirm = typer.confirm("\nAdd this document to config?")
+        if not confirm:
+            print("Cancelled")
+            raise typer.Exit(0)
         print()
 
     # Validate required document_id
