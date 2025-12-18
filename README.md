@@ -41,7 +41,23 @@ You have three options for specifying which documents to track:
 
 **Option 1: YAML Configuration File (Recommended for multiple documents)**
 
-Create a `documents.yaml` file:
+Use the interactive `config` commands to manage your `documents.yaml` file:
+
+```bash
+# Initialize a new config file from template
+uv run google-sync config init
+
+# Add documents interactively (just paste the URL when prompted)
+uv run google-sync config add
+
+# Or add directly with all options
+uv run google-sync config add https://docs.google.com/document/d/DOC_ID/edit -n cv-matt -g daily
+
+# List configured documents
+uv run google-sync config list
+```
+
+Or manually create/edit `documents.yaml`:
 
 ```bash
 cp documents.yaml.example documents.yaml
@@ -83,7 +99,7 @@ GOOGLE_OAUTH_CLIENT_SECRETS=path/to/client_secrets.json
 
 **Option 3: CLI Arguments (Ad-hoc usage)**
 
-Pass document IDs directly when running the command (see Usage below).
+Pass document IDs or URLs directly when running the download command (see Usage below).
 
 ### 4. Install Dependencies
 
@@ -122,6 +138,39 @@ uv run google-sync auth --force
 uv run google-sync auth --timeout 300  # 5 minutes instead of default 120s
 ```
 
+### Managing Configuration
+
+Use the `config` subcommands to manage your `documents.yaml` file:
+
+**Initialize configuration file:**
+```bash
+uv run google-sync config init         # Create from template
+uv run google-sync config init --force # Overwrite existing
+```
+
+**Add documents to configuration:**
+```bash
+# Interactive mode - prompts for all fields (paste URL when prompted)
+uv run google-sync config add
+
+# Specify document ID, prompt for optional fields
+uv run google-sync config add DOC_ID
+
+# Paste full Google Docs URL (from browser)
+uv run google-sync config add https://docs.google.com/document/d/DOC_ID/edit
+
+# Non-interactive - provide all options directly
+uv run google-sync config add DOC_ID -n my-folder -g daily
+uv run google-sync config add DOC_ID --name my-folder --granularity weekly
+```
+
+**List configured documents:**
+```bash
+uv run google-sync config list
+```
+
+This shows all documents with their folder names and granularity settings.
+
 ### Downloading Documents
 
 Once authenticated, download document revisions:
@@ -133,18 +182,22 @@ uv run google-sync download
 
 **Using CLI arguments (one or more documents):**
 ```bash
-# Single document
+# Single document by ID
 uv run google-sync download 1Q-qMIRexwdCRd38hhCRHEBpXeru2oi54LwfQU7NvWi8
 
-# Multiple documents
-uv run google-sync download DOC_ID_1 DOC_ID_2 DOC_ID_3
+# Paste full URL from browser
+uv run google-sync download https://docs.google.com/document/d/DOC_ID/edit
+
+# Multiple documents (IDs or URLs)
+uv run google-sync download DOC_ID_1 DOC_ID_2 https://docs.google.com/document/d/DOC_ID_3/edit
 ```
 
 **Show all available commands:**
 ```bash
-uv run google-sync --help
-uv run google-sync auth --help
-uv run google-sync download --help
+uv run google-sync --help           # Main help
+uv run google-sync auth --help      # Authentication help
+uv run google-sync download --help  # Download help
+uv run google-sync config --help    # Config management help
 ```
 
 ### Output
