@@ -286,21 +286,86 @@ def config_init(force: bool = typer.Option(False, "--force", "-f", help="Overwri
 
 @config_app.command("add")
 def config_add(
-    document_id: str = typer.Argument(..., help="Google Doc ID to add"),
+    document_id: str = typer.Argument(None, help="Google Doc ID to add"),
     name: str = typer.Option(None, "--name", "-n", help="Custom folder name"),
-    granularity: Granularity = typer.Option("all", "--granularity", "-g", help="Time granularity for revisions"),
+    granularity: Granularity = typer.Option(None, "--granularity", "-g", help="Time granularity for revisions"),
+    non_interactive: bool = typer.Option(False, "--non-interactive", help="Disable interactive prompts"),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompt"),
 ) -> None:
     """
-    Add a new document to documents.yaml configuration.
+    Add a new document to documents.yaml configuration (interactive).
 
-    Creates documents.yaml if it doesn't exist.
+    If arguments are not provided, will prompt interactively.
 
     Examples:
-        uv run google-sync config add DOC_ID
-        uv run google-sync config add DOC_ID --name cv-matt
-        uv run google-sync config add DOC_ID --name cv-matt --granularity daily
+        uv run google-sync config add                                # Interactive mode
+        uv run google-sync config add DOC_ID                         # With confirmation
+        uv run google-sync config add DOC_ID --yes                   # Skip confirmation
+        uv run google-sync config add DOC_ID --name cv-matt --yes    # Full non-interactive
     """
     config_file = Path("documents.yaml")
+
+    # Interactive mode: prompt for missing values
+    if not non_interactive:
+        print("📝 Add a new document to configuration\n")
+
+        # Prompt for document ID if not provided
+        if not document_id:
+            document_id = typer.prompt("Google Doc ID")
+        else:
+            print(f"Google Doc ID: {document_id}")
+
+        # Prompt for custom name if not provided
+        if name is None:
+            name_input = typer.prompt(
+                "Custom folder name (optional, press Enter to skip)",
+                default="",
+                show_default=False,
+            )
+            name = name_input if name_input else None
+
+        if name:
+            print(f"Folder name: {name}")
+
+        # Prompt for granularity if not provided
+        if granularity is None:
+            print("\nGranularity options:")
+            print("  all     - Download all revisions (default)")
+            print("  hourly  - Final revision per hour")
+            print("  daily   - Final revision per day")
+            print("  weekly  - Final revision per week")
+            print("  monthly - Final revision per month")
+
+            valid_granularities = ["all", "hourly", "daily", "weekly", "monthly"]
+            while True:
+                gran_input = typer.prompt("\nGranularity", default="all")
+                if gran_input in valid_granularities:
+                    granularity = gran_input
+                    break
+                else:
+                    print(f"✗ Invalid granularity. Choose from: {', '.join(valid_granularities)}")
+
+        print(f"Granularity: {granularity}")
+
+        # Show summary and confirm
+        print("\n" + "─" * 50)
+        print("Summary:")
+        print(f"  Document ID: {document_id}")
+        print(f"  Folder name: {name or '(use document ID)'}")
+        print(f"  Granularity: {granularity}")
+        print("─" * 50)
+
+        if not yes:
+            confirm = typer.confirm("\nAdd this document to config?")
+            if not confirm:
+                print("Cancelled")
+                raise typer.Exit(0)
+        print()
+
+    # Validate required document_id
+    if not document_id:
+        print("✗ Document ID is required!", file=sys.stderr)
+        raise typer.Exit(1)
 
     # Load existing config or create new
     if config_file.exists():
@@ -322,11 +387,11 @@ def config_add(
             raise typer.Exit(1)
 
     # Add new document
-    if name or granularity != "all":
+    if name or (granularity and granularity != "all"):
         new_doc = {"id": document_id}
         if name:
             new_doc["name"] = name
-        if granularity != "all":
+        if granularity and granularity != "all":
             new_doc["granularity"] = granularity
         config["documents"].append(new_doc)
     else:
@@ -340,7 +405,7 @@ def config_add(
     print(f"✓ Added document {document_id} to config")
     if name:
         print(f"  Folder name: {name}")
-    if granularity != "all":
+    if granularity and granularity != "all":
         print(f"  Granularity: {granularity}")
 
 
