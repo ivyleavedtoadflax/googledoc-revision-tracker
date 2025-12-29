@@ -213,3 +213,4 @@ client_secret.json
 token.json
 documents.yaml
 .claude/
+.specify/
