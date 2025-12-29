@@ -212,3 +212,6 @@ __marimo__/
 client_secret.json
 token.json
 documents.yaml
+.claude/
+.specify/
+specs/

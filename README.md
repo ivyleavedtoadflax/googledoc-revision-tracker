@@ -1,5 +1,7 @@
 # Google Docs Revision Tracker
 
+[![Type Checking](https://github.com/ivyleavedtoadflax/googledoc-revision-tracker/actions/workflows/type-check.yml/badge.svg)](https://github.com/ivyleavedtoadflax/googledoc-revision-tracker/actions/workflows/type-check.yml)
+
 A Python CLI tool to download and track Google Docs revision history.
 
 ## Features
@@ -313,6 +315,20 @@ The Drive API v2 only returns "grouped" revisions. Fine-grained revision history
 Google API rate limits may be hit when downloading many revisions. The tool will skip failed revisions and continue with the rest. Re-run the command to retry failed downloads.
 
 ## Development
+
+### Type Checking
+
+This project uses [ty](https://docs.astral.sh/ty/) for type checking. Run type checking locally before committing:
+
+```bash
+# Check all Python files
+uv run ty check
+
+# Check specific files
+uv run ty check main.py drive_revisions.py
+```
+
+For more details on type checking setup and IDE integration, see [specs/001-ty-type-checking/quickstart.md](specs/001-ty-type-checking/quickstart.md).
 
 ### Running Tests
 
