@@ -1,6 +1,6 @@
 # Google Docs Revision Tracker
 
-[![Type Checking](https://github.com/USER/REPO/actions/workflows/type-check.yml/badge.svg)](https://github.com/USER/REPO/actions/workflows/type-check.yml)
+[![Type Checking](https://github.com/ivyleavedtoadflax/googledoc-revision-tracker/actions/workflows/type-check.yml/badge.svg)](https://github.com/ivyleavedtoadflax/googledoc-revision-tracker/actions/workflows/type-check.yml)
 
 A Python CLI tool to download and track Google Docs revision history.
 
