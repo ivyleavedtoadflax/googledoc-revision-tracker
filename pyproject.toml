@@ -17,3 +17,40 @@ google-sync = "main:app"
 
 [tool.setuptools]
 py-modules = ["drive_revisions", "main"]
+
+[dependency-groups]
+dev = [
+    "hypothesis>=6.148.8",
+    "pytest>=9.0.2",
+    "ty>=0.0.8",
+]
+
+# ty Type Checker Configuration
+[tool.ty]
+# Start with gradual typing - don't require all code to be typed
+# strict = false
+
+# Target Python 3.12 (project minimum)
+# python_version = "3.12"
+
+# Show error codes for easier documentation lookup
+# show_error_codes = true
+
+[tool.ty.src]
+# Exclude virtual environment and cache directories
+exclude = [
+    ".venv",
+    "__pycache__",
+    "*.egg-info",
+]
+
+# Configure rule severities
+[tool.ty.rules]
+# Critical: Must fix before merge
+# type-mismatch = "error"
+# unknown-attribute = "error"
+# wrong-argument-type = "error"
+
+# Important: Should fix but can warn
+# missing-return-type = "warning"
+# unreachable-code = "warning"
